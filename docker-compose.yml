@@ -1,0 +1,158 @@
+version: "3.2"
+services:
+  ### mysql ############################################################################################################
+  mysql:
+    image: mysql:${MYSQL_VERSION:-latest}
+    restart: always
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql:/var/lib/mysql
+      - ./docker/web/mysql/database:/docker-entrypoint-initdb.d
+    networks:
+      - backend
+    environment:
+      MYSQL_ROOT_PASSWORD: "${DB_PASSWORD}"
+      MYSQL_DATABASE: "${DB_DATABASE}"
+      MYSQL_USER: "${DB_PASSWORD}"
+      MYSQL_PASSWORD: "${DB_USERNAME}"
+    container_name: ${MYSQL_CONTAINER_NAME}    
+  ### redis ############################################################################################################
+  redis:
+    image: redis:${REDIS_VERSION}
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - backend
+    container_name: ${REDIS_CONTAINER_NAME}
+  ### web ##############################################################################################################
+  web:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    env_file:
+      - .env
+    depends_on:
+      - mysql
+    links:
+      - redis
+    networks:
+      - backend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ${PROJECT_ROOT}:/var/www/app/
+      - ${VENDOR_ROOT}:/var/www/app/vendor  
+      - ${USERFILE_ROOT}:/var/www/app/userfiles      
+      - ${PHP_LOCAL_CONFIG}:/etc/php/7.4/apache2/conf.d/override_php.ini
+      - ${MSMTP_LOCAL_CONFIG}:/etc/msmtprc
+    container_name: ${APACHE_PHP_CONTAINER_NAME}    
+  ### composer #########################################################################################################
+  composer:
+    image: "composer"
+    working_dir: /var/www/app/
+    volumes:
+      - ${PROJECT_ROOT}/:/var/www/app/
+    command: ["install", "--ignore-platform-reqs"]
+    container_name: ${COMPOSER_CONTAINER_NAME}
+  ### mailhog ##########################################################################################################
+  mailhog:
+    image: mailhog/mailhog
+    restart: always
+    ports:
+      - 1025:1025
+      - 8025:8025
+    container_name: ${MAILHOG_CONTAINER_NAME}
+    networks:
+      - backend
+  ### hostmachine ######################################################################################################
+  hostmachine:
+    image: qoomon/docker-host
+    cap_add: [ 'NET_ADMIN', 'NET_RAW' ]
+    restart: on-failure
+    networks:
+      - backend
+    container_name: ${HOSTMACHINE_CONTAINER_NAME}
+  ### mongo ############################################################################################################
+  mongo:
+    image: mongo:3
+    #DB in share for persistence
+    volumes:
+      - mongo:/data/db
+    environment:
+      - spring.data.mongodb.host=0.0.0.0
+      - spring.data.mongodb.port=27017
+    container_name: ${MONGODB_CONTAINER_NAME}
+    networks:
+      - backend
+  ###ElasticSearch #####################################################################################################
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch-oss:6.8.5
+    volumes:
+      - elasticsearch:/usr/share/elasticsearch/data
+    environment:
+      - http.host=0.0.0.0
+      - transport.host=localhost
+      - network.host=0.0.0.0
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    container_name: ${ELASTICSEARCH_CONTAINER_NAME}
+    networks:
+      - backend
+  ### graylog ############################################################################################################
+  graylog:
+    image: graylog/graylog:3.2
+    volumes:
+      - journal:/usr/share/graylog/data/journal
+      - ${GRAYLOG_CONFIG}:/usr/share/graylog/data/config
+      #volumes:
+      #- ./docker/graylog/config:/usr/share/graylog/data/config
+      #- ./docker/data/journal:/usr/share/graylog/data/journal
+    environment:
+      # CHANGE ME (must be at least 16 characters)!
+      - GRAYLOG_PASSWORD_SECRET=ebuerograylogadmin
+      # Password: admin
+      - GRAYLOG_ROOT_PASSWORD_SHA2=8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918
+      - GRAYLOG_HTTP_EXTERNAL_URI=http://127.0.0.1:7000/
+      - GRAYLOG_NODE_ID="dec7fa69-ae3b-488f-970d-ef707e727345"
+    links:
+      - mongo:mongo
+      - elasticsearch
+    depends_on:
+      - mongo
+      - elasticsearch
+    ports:
+      # Graylog web interface and REST API
+      - 7000:9000
+      # GELF http
+      - 12201:12201
+      # Syslog TCP
+      - 1514:1514
+      # Syslog UDP
+      - 1514:1514/udp
+      # GELF TCP
+      - 5555:5555
+      # GELF UDP
+      - 12201:12201/udp
+    networks:
+      - backend
+    container_name: ${GRAYLOG_CONTAINER_NAME}
+
+networks:
+  backend:
+    driver: bridge
+volumes:
+  mysql:
+  mongo:
+  elasticsearch:
+  journal:
