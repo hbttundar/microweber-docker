@@ -1,0 +1,1 @@
+FROM qoomon/docker-host

@@ -53,17 +53,20 @@ mv composer.phar /usr/local/bin/composer
 chmod +x /usr/local/bin/composer
 composer self-update
 if [ "$APP_ENV" = "local" ]; then
+  if [ "$INSTALL_XDEBUG" = "true" ]; then
     echo '-----------------------------------------------------------------------------------'
     echo '------------- you select to install x-debug ---------------------------------------'
     echo '-----------------------------------------------------------------------------------'
     apt-get install -yq --no-install-recommends php-xdebug
+  fi
 else
   cp /tmp/msmtprc /etc/msmtprc
 fi
-echo '-----------------------------------------------------------------------------------'
-echo '--------------- you select to install Redis ---------------------------------------'
-echo '-----------------------------------------------------------------------------------'
-apt-get install -yq --no-install-recommends redis
-
+if [ "$INSTALL_REDIS" = "true" ]; then
+  echo '-----------------------------------------------------------------------------------'
+  echo '--------------- you select to install Redis ---------------------------------------'
+  echo '-----------------------------------------------------------------------------------'
+  apt-get install -yq --no-install-recommends redis
+fi
 
 apt-get clean && rm -rf /var/lib/apt/lists/*

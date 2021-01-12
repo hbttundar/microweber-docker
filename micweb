@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+# export micweb to bash $PATH envronment variable
+CURRENT_DIR=$(pwd)
+echo "export PATH=$CURRENT_DIR:$PATH" >> ~/.bashrc
+UNAMEOUT="$(uname -s)"
+# Regular Colors
+BLACK='\033[0;30m'  # Black
+RED='\033[0;31m'    # Red
+GREEN='\033[0;32m'  # Green
+YELLOW='\033[0;33m' # Yellow
+BLUE='\033[0;34m'   # Blue
+PURPLE='\033[0;35m' # Purple
+CYAN='\033[0;36m'   # Cyan
+WHITE='\033[0;37m'  # White
+NC='\033[0m'
+# Verify operating system is supported...
+case "${UNAMEOUT}" in
+Linux*) MACHINE=linux ;;
+Darwin*) MACHINE=mac ;;
+*) MACHINE="UNKNOWN" ;;
+esac
+
+if [ "$MACHINE" == "UNKNOWN" ]; then
+  echo -e ${YELLOW}"Unsupported operating system [$(uname -s)]. micweb supports macOS, Linux, and Windows (WSL2)."
+fi
+# Define environment variables...
+export PUID=$(id -u)
+export PGID=$(id -g)
+
+if [ "$MACHINE" == "linux" ]; then
+  export SEDCMD="sed -i"
+elif [ "$MACHINE" == "mac" ]; then
+  export SEDCMD="sed -i .bak"
+fi
+# Ensure that Docker is running...
+if ! docker info >/dev/null 2>&1; then
+  echo -e "${WHITE}Docker is not running.${NC}"
+  exit 1
+fi
+COMPOSE="docker-compose"
+if [ $# -gt 0 ]; then
+  if [ "$1" == "help" ] || [ "$1" == "-h" ]; then
+    shift 1
+    echo -e ${GREEN} "You have these commands for running:\r\n"
+    echo -e ${RED} "up:"
+    echo -e ${CYAN} "micweb up use for running docker-compose up command\r\n"
+    echo -e ${PURPLE} "sample : micweb up \r\n"
+    echo -e ${RED} "php:"
+    echo -e ${CYAN} "micweb php use for proxy php commands to your web container service \r\n"
+    echo -e ${PURPLE} "sample : micweb php -v \r\n"
+    echo -e ${RED} "artisan|art|a:"
+    echo -e ${CYAN} "micweb artisan|art|a use for proxy artisan commands to your web container service \r\n"
+    echo -e ${PURPLE} "sample : micweb artisan cache:clear  \r\n"
+    echo -e ${BLUE} "sample : micweb art cache:clear \r\n"
+    echo -e ${GREEN} "sample : micweb a cache:clear \r\n"
+    echo -e ${RED} "composer|comp|c:"
+    echo -e ${CYAN} "micweb composer|comp|c use for proxy composer commands to your web container service \r\n"
+    echo -e ${RED} "dusk:"
+    echo -e ${CYAN} "micweb dusk use for proxy artisan dusk commands to your web container service \r\n"
+    echo -e ${PURPLE} "sample : micweb artisan dusk dusk:chrome-driver \r\n"
+    echo -e ${RED} "tinker:"
+    echo -e ${CYAN} "micweb tinker use for proxy artisan tinker commands to your web container service \r\n"
+    echo -e ${PURPLE} "sample : micweb artisan tinker \r\n"
+    echo -e ${RED} "app-console|a-console:"
+    echo -e ${CYAN} "micweb app-console|a-console use for proxy php Interactive mode enabled to your web container service  \r\n"
+    echo -e ${PURPLE} "sample : micweb app-console \r\n"
+    echo -e ${BLUE} "sample : micweb a-console \r\n"
+    echo -e ${RED} "test|t:"
+    echo -e ${CYAN} "micweb test|t use for proxy artisan test to your web container service  \r\n"
+    echo -e ${PURPLE} "micweb test --testsuite=Feature --stop-on-failure\r\n"
+    echo -e ${BLUE} "micweb t --testsuite=Feature --stop-on-failure\r\n"
+    echo -e ${RED} "yarn:"
+    echo -e ${CYAN} "micweb yarn use for proxy node yarn command to your node container service  \r\n"
+    echo -e ${PURPLE} "micweb yarn test \r\n"
+    echo -e ${RED} "npm:"
+    echo -e ${CYAN} "micweb npm use for proxy npm command to your node container service  \r\n"
+    echo -e ${PURPLE} "micweb npm install \r\n"
+    echo -e ${RED} "node:"
+    echo -e ${CYAN} "micweb node use for proxy node command to your node container service  \r\n"
+    echo -e ${PURPLE} "micweb node install \r\n"
+    echo -e ${RED} "shell:"
+    echo -e ${CYAN} "micweb shell use for proxy bash command to your web container service  \r\n"
+
+  elif
+    [ "$1" == "up" ]
+  then
+    shift 1
+    $COMPOSE up -d
+  elif [ "$1" == "reload" ] || [ "$1" == "restart" ] || [ "$1" == "rs" ] || [ "$1" == "rl" ]; then
+    $COMPOSE down && $COMPOSE up -d
+  elif [ "$1" == "php" ]; then
+    shift 1
+    EXEC_CMD="cd /var/www/app && php $@"
+    $COMPOSE exec -u micweb web bash -c "$EXEC_CMD"
+  # Proxy the "artisan" command to the "php artisan dusk" Artisan command...
+  elif [ "$1" == "artisan" ] ; then
+    shift 1
+    EXEC_CMD="cd /var/www/app && php artisan $@"
+    $COMPOSE exec -u micweb web bash -c "$EXEC_CMD"
+  # Proxy the 'composer' command to web container
+  elif [ "$1" == "composer" ] || [ "$1" == "comp" ] || [ "$1" == "c" ]; then
+    shift 1
+    EXEC_CMD="cd /var/www/app && composer $@"
+    $COMPOSE exec -u micweb web bash -c "$EXEC_CMD"
+  # Proxy the "dusk" command to the "php artisan dusk" Artisan command...
+  elif [ "$1" == "dusk" ]; then
+    shift 1
+    EXEC_CMD="cd /var/www/app && php artisan dusk $@"
+    $COMPOSE exec -u micweb web bash -c "$EXEC_CMD"
+  # Initiate a Laravel Tinker session within the application container...
+  elif [ "$1" == "tinker" ]; then
+    shift 1
+    EXEC_CMD="cd /var/www/app && php artisan tinker $@"
+    $COMPOSE exec -u micweb web bash -c "$EXEC_CMD"
+  elif [ "$1" == "app-console" ] || [ "$1" == "a-console" ]; then
+    shift 1
+    EXEC_CMD="php -a $@"
+    $COMPOSE exec -u micweb web bash -c "$EXEC_CMD"
+  elif [ "$1" == "test" ] || [ "$1" == "t" ]; then
+    shift 1
+    EXEC_CMD="cd /var/www/app && php artisan test "$@""
+    $COMPOSE exec web bash -c "$EXEC_CMD"
+  # Proxy yarn commands to the "nod" binary on the application container...
+  elif [ "$1" == "yarn" ]; then
+    shift 1
+    EXEC_CMD="node yarn $@"
+    $COMPOSE exec -u micweb node bach -c "$EXEC_CMD"
+  # Proxy npm commands to the "npm" binary on the application container...
+  elif [ "$1" == "npm" ]; then
+    shift 1
+    EXEC_CMD="npm $@"
+    $COMPOSE exec -u micweb node bash -c "$EXEC_CMD"
+  # Proxy php commands to the "npm" binary on the application container...
+  elif [ "$1" == "php" ]; then
+    shift 1
+    EXEC_CMD="cd /var/www/app && php $@"
+    $COMPOSE exec -u micweb web bash -c "$EXEC_CMD"
+  elif [ "$1" == "node" ]; then
+    shift 1
+    EXEC_CMD="node $@"
+    $COMPOSE exec -u micweb node bash -c "$EXEC_CMD"
+    # Initiate a MySQL CLI terminal session within the "mysql" container...
+  elif [ "$1" == "mysql" ]; then
+    shift 1
+    EXEC_CMD="bash -c MYSQL_PWD=${MYSQL_ROOT_PASSWORD} mysql -u root ${MYSQL_DATABASE}"
+    $COMPOSE exec mysql "$EXEC_CMD"
+    # Initiate a Bash shell within the application container...
+  elif [ "$1" == "shell" ]; then
+    shift 1
+    EXEC_CMD="bash"
+    $COMPOSE exec -u micweb web "$EXEC_CMD"
+  # Pass unknown commands to the "docker-compose" binary...
+  else
+    $COMPOSE $@
+  fi
+else
+  $COMPOSE ps
+fi

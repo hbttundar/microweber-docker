@@ -1,0 +1,12 @@
+#!/bin/bash
+docker build -t  composer -f composer/Dockerfile
+docker build -t  elasticsearch -f elasticsearch/Dockerfile
+docker build -t  graylog -f graylog/Dockerfile
+docker build -t  hostmachine -f hostmachine/Dockerfile
+docker build -t  mailhog -f mailhog/Dockerfile
+docker build -t  mongo -f mongo/Dockerfile
+docker build -t  mysql -f mysql/Dockerfile
+docker build -t  node -f node/Dockerfile
+docker build -t  redis -f redis/Dockerfile
+docker build -t  web -f web/Dockerfile
+docker build -t  webpack -f webpack/Dockerfile
